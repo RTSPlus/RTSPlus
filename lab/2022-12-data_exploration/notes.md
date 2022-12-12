@@ -32,6 +32,7 @@ oid = ?
 or = ?
 rid = ?
   - unused
+  - some values of rid are "MAN" for some reason?
 blk = ?
   - unused
 tripid = ?
