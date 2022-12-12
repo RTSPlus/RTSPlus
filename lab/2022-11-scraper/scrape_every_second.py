@@ -23,8 +23,6 @@ con = duckdb.connect(database="bus_data.duckdb", read_only=False)
 our_id_column_name = "request_time_ms"
 columns = [x[0] for x in con.execute('describe queries').fetchall()]
 
-# Load env variables with python-dotenv
-
 def api_call(endpoint_url, request_type, params={}, xtime=None):
     hash_key = os.getenv('RTS_HASH_KEY')
     api_key = os.getenv('RTS_API_KEY')
@@ -97,15 +95,14 @@ while True:
             except:
                 pass
 
-    new_data = defaultdict(list)
+    if len(results) != 0:
+        new_data = defaultdict(list)
 
-    df = pd.DataFrame({ i: [] for i in columns })
-    # print(f"Got {len(results)} results")
-    for result in results:
-        new_data[our_id_column_name].append(xtime)
-        for key in columns:
-            new_data[key].append(result[key])
-    df = pd.DataFrame.from_dict(new_data)
-    con.execute('insert into queries select * from df')
+        for result in results:
+            new_data[our_id_column_name].append(xtime)
+            for key in columns:
+                new_data[key].append(result[key])
+        df = pd.DataFrame.from_dict(new_data)
+        con.execute('insert into queries select * from df')
 
     time.sleep(max(interval - (time.time() - (xtime / 1000)), 0))
