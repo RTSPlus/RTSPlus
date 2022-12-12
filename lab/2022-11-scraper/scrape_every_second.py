@@ -7,12 +7,21 @@ import urllib.request
 from urllib.parse import urlencode
 import json
 import os
-
-import sqlite3
 import atexit
+from collections import defaultdict
 
+import duckdb
+import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# seconds
 interval = 5
-con = sqlite3.connect("bus_data.db")
+con = duckdb.connect(database="bus_data.duckdb", read_only=False)
+
+our_id_column_name = "request_time_ms"
+columns = [x[0] for x in con.execute('describe queries').fetchall()]
 
 # Load env variables with python-dotenv
 
@@ -88,9 +97,15 @@ while True:
             except:
                 pass
 
-    # create table queries(id integer primary key, data text);
-    cur = con.cursor()
-    cur.execute("insert into queries values(?, ?)", (xtime, json.dumps(results)))
-    con.commit()
+    new_data = defaultdict(list)
 
-    time.sleep(interval)
+    df = pd.DataFrame({ i: [] for i in columns })
+    # print(f"Got {len(results)} results")
+    for result in results:
+        new_data[our_id_column_name].append(xtime)
+        for key in columns:
+            new_data[key].append(result[key])
+    df = pd.DataFrame.from_dict(new_data)
+    con.execute('insert into queries select * from df')
+
+    time.sleep(max(interval - (time.time() - (xtime / 1000)), 0))
