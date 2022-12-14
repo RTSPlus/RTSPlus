@@ -77,7 +77,13 @@ select max(lat), min(lat), max(lon), min(lon) from (select lat,lon from queries 
 
 lat/lon returns 0 in some cases
 
-max lat: 29.715414315424184
-min lat: 29.5993112045104
-max lon: -82.26359958976886
-min lon: -82.4392548
+max lon: -82.24136916824027
+min lon: -82.446655
+max lat: 29.715481941424365
+min lat: 29.589633295601942
+
+map.jpg bounds (square ratio):
+max lon: -82.2413
+min lon: -82.4467
+max lat: 29.7418
+min lat: 29.5633
