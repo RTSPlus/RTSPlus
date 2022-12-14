@@ -1,3 +1,5 @@
+# Honestly this doesnt really work so dont use it
+
 import urllib.parse
 import subprocess
 from math import sin, pi
@@ -13,7 +15,7 @@ size = 640, 640
 format = "jpg"
 
 params = {
-    "key": "AIzaSyCU1pMXd8rnm3W8r4w5H0ylMnnPS2atJ4g",
+    "key": "",
     "size": f"{size[0]}x{size[1]}",
     "scale": 2,
     "markers": f"color:blue|{max_lat},{max_lon}|{min_lat},{min_lon}",
