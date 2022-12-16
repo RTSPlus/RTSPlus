@@ -50,51 +50,58 @@
 
 # bus payload:
 
-vid = vehicle id
-tmstmp = timestamp
-
-- useless tbh. only has minute level precision
-  lat = latitude
-  lon = longitude
-  hdg = heading ?
-- seems to return values 0-360
-  pid = ?
-  rt = route number
-  des = destination
-  pdist = ?
-- distance to something
-  dly = delay?
-  spd = speed?
-- unused
-  tatripid = ?
-- trip designator?
-  origtatripno = ?
-- unused
-  tablockid = ?
-- unused
-  zone = ?
-  mode = ?
-  psgld = ?
-  srvtmstmp = timestamp
-- unused
+- vid = vehicle id
+- tmstmp = timestamp
+  - useless tbh. only has minute level precision
+- lat = latitude
+- lon = longitude
+- hdg = heading ?
+  - seems to return values 0-360
+- pid = pattern id
+  - pattern = "route"
+  - read with getpatterns
+  - has stops/inbound/outbound
+- rt = route number
+- des = destination
+- pdist
+  - parametric distance from the start of the route?
+  - idk units
+- dly = delay?
+- spd = speed?
+  - unused
+- tatripid = ?
+  - trip designator?
+- origtatripno = ?
+  - unused
+  - idk the difference between this and tripid
+  - unique on every trip
+- tablockid = ?
+  - unused
+- zone = ?
+- mode = ?
+- psgld = ?
+- srvtmstmp = timestamp
+  - unused
 - idk why this is different from tmstmp
-  oid = ?
+- oid = ?
 - unused
-  or = ?
-  rid = ?
-- unused
-- some values of rid are "MAN" for some reason?
-  blk = ?
-- unused
-  tripid = ?
-- can make a request to query tripid
-  tripdyn = ?
-- unused
-  stst = ?
-- unused
-  stds = date
-- unused
-- superfluous
+- or = ?
+- rid = ?
+  - unused
+  - some values of rid are "MAN" for some reason?
+- blk = ?
+  - unused
+- tripid = ?
+  - can make a request to query tripid
+  - unique on every trip
+- tripdyn = ?
+  - unused
+- stst = ?
+  - unused
+  - unique on every trip
+- stds = date
+  - unused
+  - superfluous
 
 ```json
 {'vid': '708',
