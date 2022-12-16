@@ -66,6 +66,7 @@
 - pdist
   - parametric distance from the start of the route?
   - idk units
+    - pretty sure meters upon further investigation?
 - dly = delay?
 - spd = speed?
   - unused
