@@ -149,3 +149,27 @@ max lon: -82.2413
 min lon: -82.4467
 max lat: 29.7418
 min lat: 29.5633
+
+# SQL Commands
+
+```sql
+-- Get the dates of all the queries
+select distinct date_formatted from
+  (select left(epoch_ms(request_time_ms), 11) as date_formatted from queries);
+
+-- count of queries per day
+select count(*) from
+  (select left(epoch_ms(request_time_ms), 11) as date_formatted, * from queries)
+group by date_formatted
+limit 10;
+
+-- Select number of routes per day and list day of the week
+select count(distinct rt) as rt_count, date_formatted, strftime(date_formatted::DATE, '%a')
+from
+  (select left(epoch_ms(request_time_ms), 11) as date_formatted, * from queries)
+group by date_formatted
+order by rt_count;
+
+-- Show routes serviced per weekday
+select distinct rt as rts, date_formatted, strftime(date_formatted::DATE, '%a')  from (select left(epoch_ms(request_time_ms), 11) as date_formatted, * from queries) group by date_formatted, rts order by date_formatted, rts;
+```
