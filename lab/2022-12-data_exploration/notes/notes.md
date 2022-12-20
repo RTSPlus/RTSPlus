@@ -18,9 +18,10 @@
   - returns "patterns" for a route
     - pid? idk what this exactly is
     - ln = length?
-    - dtrid = ?
+    - dtrid = detour route id?
     - inbound/outbound + coordinates
-      - dtrpt: array of points
+      - pt/dtrpt: array of points
+        - pt = normal points, dtrpt = detour points
         - lat/lon
         - name
         - typ: "s" = stop?, "w" = waypoint?
