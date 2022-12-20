@@ -7,3 +7,7 @@ env/
 *.db
 *.duckdb
 *.duckdb.wal
+
+*.pyc
+*.csv
+*.xlsx
