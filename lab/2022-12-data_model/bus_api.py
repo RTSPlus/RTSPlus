@@ -112,6 +112,5 @@ async def async_api_call(
 
     url, headers = build_api_url(endpoint_url, request_type, params, xtime)
 
-    # async with aiohttp.ClientSession() as session:
     async with session.get(url, headers=headers) as resp:
         return await resp.json()
