@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 import aiohttp
 import asyncio
 
@@ -6,7 +6,7 @@ from bus_api import API_Call, async_api_call
 
 from data_model import PathPoint, PathStopPoint, Route, RoutePath
 
-async def main():
+async def build_routes():
     async def add_rt_to_await(rt, method):
         return rt, await method
 
@@ -34,7 +34,7 @@ async def main():
         pattern_responses = await asyncio.gather(*route_pattern_futures)
         
         # Get route paths
-        built_routes = {}
+        built_routes: Dict[int, Route] = {}
         for rt, pattern in pattern_responses:
             built_paths = {}
             for ptr in pattern['bustime-response']['ptr']:
@@ -73,8 +73,6 @@ async def main():
                 )
 
                 built_paths[route_path.id] = route_path
-            built_routes[rt['rt']] = Route(int(rt['rt']), rt['rtnm'], rt['rtclr'], built_paths)
+            built_routes[int(rt['rt'])] = Route(int(rt['rt']), rt['rtnm'], rt['rtclr'], built_paths)
 
-        print(built_routes)
-
-asyncio.run(main())
+        return built_routes
