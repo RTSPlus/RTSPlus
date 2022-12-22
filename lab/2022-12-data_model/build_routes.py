@@ -124,7 +124,7 @@ async def build_routes(proj_dist_scaling_factor=1):
                                     lon=pt["lon"],
                                     name=pt["stpnm"],
                                     id=pt["stpid"],
-                                    dist=pt["pdist"],
+                                    reported_dist=pt["pdist"],
                                     projected_dist=proj_dist,
                                 )
                             )
@@ -146,3 +146,11 @@ async def build_routes(proj_dist_scaling_factor=1):
             )
 
         return built_routes
+
+
+def snap_route_path_google_api(route_path: RoutePath, google_api_key: str):
+    google_maps_api_input = "|".join(
+        [f"{pt.lat},{pt.lon}" for pt in route_path.path if pt.type == "W"][:100]
+    )
+    print(google_maps_api_input)
+    print(google_api_key)

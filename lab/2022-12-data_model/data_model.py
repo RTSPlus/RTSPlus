@@ -19,7 +19,7 @@ class PathStopPoint(PathPoint):
 
     name: str
     id: int
-    dist: int
+    reported_dist: int
 
 
 @dataclass(frozen=True, kw_only=True)

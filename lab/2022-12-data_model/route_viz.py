@@ -1,35 +1,53 @@
 import asyncio
 import pickle
+from typing import Dict
+import os
 
-from vincenty import vincenty
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from dotenv import load_dotenv
 
-from build_routes import build_routes
-from data_model import RoutePath
+from build_routes import build_routes, snap_route_path_google_api
+from data_model import Route, RoutePath
+from util import km2ft
+
+load_dotenv()
 
 
-def calculate_path_len(path: RoutePath):
-    print("calculating path len")
-    print(f"{path.id} - {path.direction} - {path.length}")
+def experiment_with_path(path: RoutePath):
+    # print("calculating path len")
+    # print(f"{path.id} - {path.direction} - {path.length}")
 
-    for point in path.path:
-        if point.type == "S":
-            proj_dist_ft = point.projected_dist * 0.621371 * 5280
-            print(
-                f"{point.dist}m {proj_dist_ft}ft error: {abs(point.dist - proj_dist_ft) / point.dist if point.dist else 0}%"
-            )
+    # for point in path.path:
+    #     if point.type == "S":
+    #         proj_dist_ft = point.projected_dist * 0.621371 * 5280
+    #         print(
+    #             f"{point.reported_dist}ft {proj_dist_ft}ft error: {abs(point.reported_dist - proj_dist_ft) / point.reported_dist if point.reported_dist else 0}%"
+    #         )
 
-    print()
-    print(
-        f"Distance: {path.path[-1].projected_dist}km, {path.path[-1].projected_dist * 0.621371}mi, {path.path[-1].projected_dist * 0.621371 * 5280}ft"
-    )
+    # print()
+    # print(
+    #     f"Distance: {path.path[-1].projected_dist}km, {path.path[-1].projected_dist * 0.621371}mi, {path.path[-1].projected_dist * 0.621371 * 5280}ft"
+    # )
+    # print(
+    #     "|".join(
+    #         [
+    #             f"{point.lat},{point.lon}"
+    #             for point in path.path[:100]
+    #             if point.type == "W"
+    #         ]
+    #     )
+    # )
+    # for point in path.path:
+    # print(point.lat
+
+    snap_route_path_google_api(path, os.environ.get("GOOGLE_API_KEY"))
 
 
 async def main():
-    routes = await build_routes(proj_dist_scaling_factor=0.98)
-    # routes = pickle.load( open( "routes.p", "rb" ) )
+    # routes = await build_routes(proj_dist_scaling_factor=0.98)
+    routes: Dict[int, Route] = pickle.load(open("routes.p", "rb"))
 
     for route_num, route in routes.items():
         print("--------")
@@ -37,27 +55,29 @@ async def main():
         print("Paths:")
         for path in route.path.values():
             print(f"\tpid: {path.id} - {path.direction}")
-            print(f"\tlength: {path.length}")
+            print(f"\treported length: {path.length}ft")
+            print(f"\tprojected length: {km2ft(path.path[-1].projected_dist)}ft")
             print(f"\tStart: {path.path[0].lat}, {path.path[0].lon}")
             print(f"\tEnd: {path.path[-1].lat}, {path.path[-1].lon}")
-            dist = vincenty(
-                (path.path[0].lat, path.path[0].lon),
-                (path.path[-1].lat, path.path[-1].lon),
-            )
-            print(
-                f"\tDistance: {dist}km, {dist * 0.621371}mi, {dist * 0.621371 * 5280}ft"
-            )
             print()
 
     # to inspect
     route_num = 1
     path_num = 500500
 
-    calculate_path_len(routes[route_num].path[path_num])
+    experiment_with_path(routes[route_num].path[path_num])
 
     path = routes[route_num].path[path_num]
     to_waypoints_df = {"lat": [], "lon": [], "typ": []}
-    to_stops_df = {"lat": [], "lon": [], "typ": [], "name": [], "id": [], "dist": []}
+    to_stops_df = {
+        "lat": [],
+        "lon": [],
+        "typ": [],
+        "name": [],
+        "id": [],
+        "dist": [],
+        "combined_text": [],
+    }
 
     for point in path.path:
         if point.type == "W":
@@ -70,7 +90,11 @@ async def main():
             to_stops_df["typ"].append(point.type)
             to_stops_df["name"].append(point.name)
             to_stops_df["id"].append(point.id)
-            to_stops_df["dist"].append(point.dist)
+            to_stops_df["dist"].append(point.reported_dist)
+
+            to_stops_df["combined_text"].append(
+                f"{point.name} - {point.id} - {point.reported_dist}ft"
+            )
 
     waypoints_df = pd.DataFrame(to_waypoints_df)
     stops_df = pd.DataFrame(to_stops_df)
@@ -91,7 +115,7 @@ async def main():
             mode="markers+text",
             lat=stops_df["lat"],
             lon=stops_df["lon"],
-            text=stops_df["name"],
+            text=stops_df["combined_text"],
             marker={"size": 10},
         )
     )
@@ -104,12 +128,12 @@ async def main():
                 "lat": waypoints_df["lat"].median(),
             },
             "style": "carto-positron",
+            # "style": "open-street-map",
+            # "style": "stamen-terrain",
             "zoom": 13,
         },
     )
 
-    # fig = px.scatter_mapbox(df, lat="lat", lon="lon", color="typ", zoom=14)
-    # fig.update_layout(mapbox_style="carto-positron")
     # fig.show()
 
 
