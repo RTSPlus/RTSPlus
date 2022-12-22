@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, List, Literal
 
+
 @dataclass(frozen=True)
 class PathPoint:
     seq: int
@@ -11,6 +12,7 @@ class PathPoint:
 
     projected_dist: int = 0
 
+
 @dataclass(frozen=True, kw_only=True)
 class PathStopPoint(PathPoint):
     type: Literal["S"] = "S"
@@ -18,6 +20,7 @@ class PathStopPoint(PathPoint):
     name: str
     id: int
     dist: int
+
 
 @dataclass(frozen=True, kw_only=True)
 class RoutePath:
@@ -28,6 +31,7 @@ class RoutePath:
 
     dtrid: int
     dtrpt: List[PathPoint]
+
 
 @dataclass(frozen=True)
 class Route:
