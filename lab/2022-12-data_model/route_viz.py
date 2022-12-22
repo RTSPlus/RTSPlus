@@ -10,18 +10,18 @@ def calculate_path_len(path: RoutePath):
     print("calculating path len")
     print(f"{path.id} - {path.direction} - {path.length}")
 
-    total_len = 0
-    for i, point in enumerate(path.path):
-        print(point)
-        if i > 0:
-            total_len += vincenty((point.lat, point.lon), (path.path[i-1].lat, path.path[i-1].lon))
+    for point in path.path:
+        if point.type == 'S':
+            proj_dist_ft = point.projected_dist * 0.621371 * 5280
+            print(f"{point.dist}m {proj_dist_ft}ft error: {abs(point.dist - proj_dist_ft) / point.dist if point.dist else 0}%")
 
-    print(f"\tDistance: {total_len}km, {total_len * 0.621371}mi, {total_len * 0.621371 * 5280}ft")
 
+    print()
+    print(f"Distance: {path.path[-1].projected_dist}km, {path.path[-1].projected_dist * 0.621371}mi, {path.path[-1].projected_dist * 0.621371 * 5280}ft")
 
 async def main():
-    # routes = await build_routes()
-    routes = pickle.load( open( "routes.p", "rb" ) )
+    routes = await build_routes(proj_dist_scaling_factor=0.9585)
+    # routes = pickle.load( open( "routes.p", "rb" ) )
 
     for route_num, route in routes.items():
         print("--------")
@@ -36,6 +36,11 @@ async def main():
             print(f"\tDistance: {dist}km, {dist * 0.621371}mi, {dist * 0.621371 * 5280}ft")
             print()
 
-    calculate_path_len(routes[1].path[500500])
+    # to inspect
+    route = 1
+    path = 500500
+
+    calculate_path_len(routes[route].path[path])
+
 
 asyncio.run(main())

@@ -1,12 +1,13 @@
 from typing import Dict, List
 import aiohttp
 import asyncio
+from vincenty import vincenty
 
 from bus_api import API_Call, async_api_call
 
 from data_model import PathPoint, PathStopPoint, Route, RoutePath
 
-async def build_routes():
+async def build_routes(proj_dist_scaling_factor=1):
     async def add_rt_to_await(rt, method):
         return rt, await method
 
@@ -41,7 +42,9 @@ async def build_routes():
                 # build path
                 paths: List[List[PathPoint]] = [[], []]
                 for path, pts in zip(paths, [ptr['pt'], ptr.get('dtrpt', [])]):
+                    # Sort so we can ensure accuracy with projected distance
                     pts.sort(key=lambda x: x['seq'])
+
                     for pt in pts:
                         # Skip duplicate points and prefer stop points over regular points
                         if path and (path[-1].lat == pt['lat'] and path[-1].lon == pt['lon']):
@@ -50,17 +53,25 @@ async def build_routes():
                             else:
                                 continue
 
+                        # Find distance difference between current and last point
+                        current_distance = 0
+                        if path:
+                            dist_diff = vincenty((pt['lat'], pt['lon']), (path[-1].lat, path[-1].lon))
+                            current_distance = path[-1].projected_dist + (dist_diff * proj_dist_scaling_factor)
+
                         if pt['typ'] == 'S':
                             path.append(PathStopPoint(
+                                seq=pt['seq'],
                                 lat=pt['lat'],
                                 lon=pt['lon'],
 
                                 name=pt['stpnm'],
                                 id=pt['stpid'],
-                                dist=pt['pdist']
+                                dist=pt['pdist'],
+                                projected_dist=current_distance
                             ))
                         else:
-                            path.append(PathPoint(pt['lat'], pt['lon']))
+                            path.append(PathPoint(pt['seq'], pt['lat'], pt['lon'], projected_dist=current_distance))
 
                 path, dtrpath = paths
                 route_path = RoutePath(
