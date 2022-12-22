@@ -45,21 +45,47 @@ async def build_routes(proj_dist_scaling_factor=1):
                     # Sort so we can ensure accuracy with projected distance
                     pts.sort(key=lambda x: x['seq'])
 
-                    for pt in pts:
+                    for i, pt in enumerate(pts):
                         # Skip duplicate points and prefer stop points over regular points
-                        if path and (path[-1].lat == pt['lat'] and path[-1].lon == pt['lon']):
+                        # De-dupe points within 1 meter
+                        if path and vincenty((pt['lat'], pt['lon']), (path[-1].lat, path[-1].lon)) <= 1.0/1000:
                             if pt['typ'] == 'S':
                                 path.pop()
                             else:
                                 continue
 
                         # Find distance difference between current and last point
-                        current_distance = 0
-                        if path:
+                        # Only count waypoints for distance
+                        if path and pt['typ'] == "W":
                             dist_diff = vincenty((pt['lat'], pt['lon']), (path[-1].lat, path[-1].lon))
-                            current_distance = path[-1].projected_dist + (dist_diff * proj_dist_scaling_factor)
+                            proj_dist = path[-1].projected_dist + (dist_diff * proj_dist_scaling_factor)
 
-                        if pt['typ'] == 'S':
+                            path.append(PathPoint(pt['seq'], pt['lat'], pt['lon'], projected_dist=proj_dist))
+                        elif pt['typ'] == "S":
+                            # Snap projected distance to closest stop point (only check last and next point)
+                            last_point = path[-1] if path else None
+                            next_point = pts[i + 1] if i + 1 < len(pts) else None
+
+                            # This logic assumes that there will no two stop points in a row
+                            if last_point:
+                                assert last_point.type == 'W'
+                            if next_point:
+                                assert next_point['typ'] == 'W'
+
+                            last_distance = last_point.projected_dist if last_point else float('inf')
+
+                            # Next point is 0 if there is no last_point
+                            # Next point is inf if there is no next_point
+                            # Next point is the distance to the next point if there is a last_point and a next_point
+                            next_distance = float('inf')
+                            if next_point:
+                                if last_point:
+                                    next_distance = path[-1].projected_dist + vincenty((last_point.lat, last_point.lon), (next_point['lat'], next_point['lon'])) * proj_dist_scaling_factor
+                                else:
+                                    next_distance = 0
+                            
+                            proj_dist = min(last_distance, next_distance)
+
                             path.append(PathStopPoint(
                                 seq=pt['seq'],
                                 lat=pt['lat'],
@@ -68,11 +94,9 @@ async def build_routes(proj_dist_scaling_factor=1):
                                 name=pt['stpnm'],
                                 id=pt['stpid'],
                                 dist=pt['pdist'],
-                                projected_dist=current_distance
+                                projected_dist=proj_dist
                             ))
-                        else:
-                            path.append(PathPoint(pt['seq'], pt['lat'], pt['lon'], projected_dist=current_distance))
-
+                            
                 path, dtrpath = paths
                 route_path = RoutePath(
                     id=ptr['pid'],
@@ -84,6 +108,7 @@ async def build_routes(proj_dist_scaling_factor=1):
                 )
 
                 built_paths[route_path.id] = route_path
+                
             built_routes[int(rt['rt'])] = Route(int(rt['rt']), rt['rtnm'], rt['rtclr'], built_paths)
 
         return built_routes
