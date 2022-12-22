@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class API_Call(Enum):
     GET_ROUTES = {
         "endpoint_url": "/api/v3/getroutes",
@@ -27,17 +28,25 @@ class API_Call(Enum):
         "request_type": "getpatterns",
     }
 
+
 RTS_HASH_KEY_STR = "RTS_HASH_KEY"
 RTS_HASH_API_STR = "RTS_API_KEY"
 
-def build_api_url(endpoint_url: str = None, request_type: str = None, params={}, xtime: int = None):
+
+def build_api_url(
+    endpoint_url: str = None, request_type: str = None, params={}, xtime: int = None
+):
     hash_key = os.getenv(RTS_HASH_KEY_STR)
     api_key = os.getenv(RTS_HASH_API_STR)
 
     if not hash_key:
-        raise Exception(f"No hash_key found in path (searching for {RTS_HASH_KEY_STR} environment variable)")
+        raise Exception(
+            f"No hash_key found in path (searching for {RTS_HASH_KEY_STR} environment variable)"
+        )
     if not api_key:
-        raise Exception(f"No api_key found in path (searching for {RTS_HASH_API_STR} environment variable)")
+        raise Exception(
+            f"No api_key found in path (searching for {RTS_HASH_API_STR} environment variable)"
+        )
 
     xtime = round(time.time() * 1000) if xtime is None else xtime
     fmt_time = datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
@@ -60,22 +69,28 @@ def build_api_url(endpoint_url: str = None, request_type: str = None, params={},
     }
     return f"https://riderts.app/bustime/{endpoint_url}?{encoded_query_params}", headers
 
-@overload
-def api_call(endpoint_url: str, request_type: str, params={}): ...
 
 @overload
-def api_call(call_type: Literal[API_Call.GET_ROUTES], params: None = None): ...
+def api_call(endpoint_url: str, request_type: str, params={}):
+    ...
+
+
+@overload
+def api_call(call_type: Literal[API_Call.GET_ROUTES], params: None = None):
+    ...
+
 
 def api_call(
-        endpoint_url: str = None,
-        request_type: str = None,
-        call_type: API_Call = None, params={},
-        xtime: int = None
-    ):
+    endpoint_url: str = None,
+    request_type: str = None,
+    call_type: API_Call = None,
+    params={},
+    xtime: int = None,
+):
 
     if call_type:
-        endpoint_url = call_type.value['endpoint_url']
-        request_type = call_type.value['request_type']
+        endpoint_url = call_type.value["endpoint_url"]
+        request_type = call_type.value["request_type"]
     else:
         if not endpoint_url:
             raise Exception("`endpoint_url` not provided")
@@ -92,18 +107,19 @@ def api_call(
         res = response.read()
         return json.loads(res)
 
+
 async def async_api_call(
-        session=aiohttp.ClientSession(),
-        endpoint_url: str = None,
-        request_type: str = None, 
-        call_type: API_Call = None,
-        params={},
-        xtime: int = None
-    ):
+    session=aiohttp.ClientSession(),
+    endpoint_url: str = None,
+    request_type: str = None,
+    call_type: API_Call = None,
+    params={},
+    xtime: int = None,
+):
 
     if call_type:
-        endpoint_url = call_type.value['endpoint_url']
-        request_type = call_type.value['request_type']
+        endpoint_url = call_type.value["endpoint_url"]
+        request_type = call_type.value["request_type"]
     else:
         if not endpoint_url:
             raise Exception("`endpoint_url` not provided")
