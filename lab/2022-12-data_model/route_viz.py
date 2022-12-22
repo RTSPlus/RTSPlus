@@ -8,14 +8,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dotenv import load_dotenv
 
-from build_routes import build_routes, snap_route_path_google_api
+from build_routes import build_routes, snap_path_google_api
 from data_model import Route, RoutePath
 from util import km2ft
 
 load_dotenv()
 
 
-def experiment_with_path(path: RoutePath):
+async def experiment_with_path(route_path: RoutePath):
     # print("calculating path len")
     # print(f"{path.id} - {path.direction} - {path.length}")
 
@@ -42,7 +42,7 @@ def experiment_with_path(path: RoutePath):
     # for point in path.path:
     # print(point.lat
 
-    snap_route_path_google_api(path, os.environ.get("GOOGLE_API_KEY"))
+    return await snap_path_google_api(route_path.path, os.environ.get("GOOGLE_API_KEY"))
 
 
 async def main():
@@ -55,7 +55,7 @@ async def main():
         print("Paths:")
         for path in route.path.values():
             print(f"\tpid: {path.id} - {path.direction}")
-            print(f"\treported length: {path.length}ft")
+            print(f"\treported length: {path.reported_length}ft")
             print(f"\tprojected length: {km2ft(path.path[-1].projected_dist)}ft")
             print(f"\tStart: {path.path[0].lat}, {path.path[0].lon}")
             print(f"\tEnd: {path.path[-1].lat}, {path.path[-1].lon}")
@@ -65,7 +65,7 @@ async def main():
     route_num = 1
     path_num = 500500
 
-    experiment_with_path(routes[route_num].path[path_num])
+    # ex = await experiment_with_path(routes[route_num].path[path_num])
 
     path = routes[route_num].path[path_num]
     to_waypoints_df = {"lat": [], "lon": [], "typ": []}
@@ -127,14 +127,14 @@ async def main():
                 "lon": waypoints_df["lon"].median(),
                 "lat": waypoints_df["lat"].median(),
             },
-            "style": "carto-positron",
-            # "style": "open-street-map",
+            # "style": "carto-positron",
+            "style": "open-street-map",
             # "style": "stamen-terrain",
             "zoom": 13,
         },
     )
 
-    # fig.show()
+    fig.show()
 
 
 asyncio.run(main())

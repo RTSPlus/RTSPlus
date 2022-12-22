@@ -4,13 +4,13 @@ from typing import Dict, List, Literal
 
 @dataclass(frozen=True)
 class PathPoint:
-    seq: int
     lat: int
     lon: int
 
     type: Literal["S", "W"] = "W"
 
     projected_dist: int = 0
+    interpolated: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -25,9 +25,10 @@ class PathStopPoint(PathPoint):
 @dataclass(frozen=True, kw_only=True)
 class RoutePath:
     id: int
-    length: int
+    reported_length: int
     direction: Literal["INBOUND", "OUTBOUND"]
     path: List[PathPoint]
+    path_orig: List[PathPoint]
 
     dtrid: int
     dtrpt: List[PathPoint]
