@@ -1,11 +1,16 @@
 import asyncio
+import datetime
 import pickle
-from typing import Dict
+from typing import Dict, List
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+from prompt_toolkit.completion import NestedCompleter
+
 import plotly.graph_objects as go
 import pandas as pd
+import duckdb
 
 
 from build_routes import build_routes
@@ -98,6 +103,8 @@ def graph_path(path: RoutePath):
 
 
 async def main():
+    con = duckdb.connect(database="../duck_data.duckdb", read_only=True)
+
     session = PromptSession()
     running = True
 
@@ -110,9 +117,36 @@ async def main():
         for key in route.path.keys():
             path_map[key] = route_key
 
+    query_days: List[datetime.date] = con.execute(
+        f"""
+            select distinct request_date from
+            (
+                select epoch_ms(request_time_ms) as request_time, date_trunc('day', request_time) as request_date, *
+                from queries
+            )
+            """
+    ).fetchall()
+
+    # Set up completer
+    completer = NestedCompleter.from_nested_dict(
+        {
+            "list": {"routes": None},
+            "query": {
+                "days": None,
+                "trips": {
+                    "day": {date[0].strftime("%Y-%m-%d"): None for date in query_days}
+                },
+            },
+            "quit": None,
+            "help": None,
+        }
+    )
+
     while running:
         with patch_stdout():
-            command = await session.prompt_async("> ")
+            command = await session.prompt_async(
+                "> ", auto_suggest=AutoSuggestFromHistory(), completer=completer
+            )
 
         match command.split():
             case [("quit" | "q")]:
@@ -151,6 +185,28 @@ async def main():
             case ["graph", "path", path_num]:
                 rt = path_map[int(path_num)]
                 graph_path(routes[rt].path[int(path_num)])
+            case ["query", "days"]:
+                res: List[datetime.date] = con.execute(
+                    f"""
+                        select distinct request_date from
+                        (
+                            select epoch_ms(request_time_ms) as request_time, date_trunc('day', request_time) as request_date, *
+                            from queries
+                        )
+                        """
+                ).fetchall()
+                for date in res:
+                    print(date[0].strftime("%y-%m-%d"))
+            case ["query", "trips", "day", day]:
+                print(day)
+                query_date = con.execute(
+                    f"""
+                    select epoch_ms(request_time_ms) as request_time, tripid
+                    from queries
+                    where request_time between '{day} 00:00' and '{day} 23:59:59' order by request_time asc;
+                """
+                ).fetchall()
+                print(query_date)
 
 
 if __name__ == "__main__":
