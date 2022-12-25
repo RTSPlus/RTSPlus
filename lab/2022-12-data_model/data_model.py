@@ -27,11 +27,16 @@ class RoutePath:
     id: int
     reported_length: int
     direction: Literal["INBOUND", "OUTBOUND"]
+
+    # Path will only contain WayPoints
     path: List[PathPoint]
     path_orig: List[PathPoint]
 
+    stops: List[PathStopPoint]
+
     dtrid: int
     dtrpt: List[PathPoint]
+    dtrstops: List[PathStopPoint]
 
 
 @dataclass(frozen=True)

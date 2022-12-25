@@ -19,6 +19,8 @@ async def build_routes(proj_dist_scaling_factor=1):
     async def add_rt_to_await(rt, method):
         return rt, await method
 
+    # Fetch patterns
+    pattern_responses = []
     async with aiohttp.ClientSession() as session:
         route_pattern_futures = []
 
@@ -44,35 +46,26 @@ async def build_routes(proj_dist_scaling_factor=1):
 
         pattern_responses = await asyncio.gather(*route_pattern_futures)
 
-        # Get route paths
-        built_routes: Dict[int, Route] = {}
-        for rt, pattern in pattern_responses:
-            built_paths = {}
-            for ptr in pattern["bustime-response"]["ptr"]:
-                # build path
-                paths: List[List[PathPoint]] = [[], []]
-                for path, pts in zip(paths, [ptr["pt"], ptr.get("dtrpt", [])]):
-                    # Sort so we can ensure accuracy with projected distance
-                    pts.sort(key=lambda x: x["seq"])
+    # Get route paths
+    built_routes: Dict[int, Route] = {}
+    for rt, pattern in pattern_responses:
+        built_paths = {}
+        for ptr in pattern["bustime-response"]["ptr"]:
+            # build paths
+            # perform the same building for normal path and detour path
+            path_list: List[List[PathPoint]] = [[], []]
+            stop_list: List[List[PathStopPoint]] = [[], []]
 
-                    for i, pt in enumerate(pts):
-                        # Skip duplicate points and prefer stop points over regular points
-                        # De-dupe points within 1 meter
-                        if (
-                            path
-                            and vincenty(
-                                (pt["lat"], pt["lon"]), (path[-1].lat, path[-1].lon)
-                            )
-                            <= 1.0 / 1000
-                        ):
-                            if pt["typ"] == "S":
-                                path.pop()
-                            else:
-                                continue
+            for path, stops, pts in zip(
+                path_list, stop_list, [ptr["pt"], ptr.get("dtrpt", [])]
+            ):
+                # Sort so we can ensure accuracy with projected distance
+                pts.sort(key=lambda x: x["seq"])
 
-                        # Find distance difference between current and last point
-                        # Only count waypoints for distance
-                        if path and pt["typ"] == "W":
+                for pt in pts:
+                    if pt["typ"] == "W":
+                        proj_dist = 0
+                        if path:
                             dist_diff = vincenty(
                                 (pt["lat"], pt["lon"]), (path[-1].lat, path[-1].lon)
                             )
@@ -80,82 +73,61 @@ async def build_routes(proj_dist_scaling_factor=1):
                                 dist_diff * proj_dist_scaling_factor
                             )
 
-                            path.append(
-                                PathPoint(
-                                    pt["lat"],
-                                    pt["lon"],
-                                    projected_dist=proj_dist,
-                                )
+                        path.append(
+                            PathPoint(
+                                pt["lat"],
+                                pt["lon"],
+                                projected_dist=proj_dist,
                             )
-                        elif pt["typ"] == "S":
-                            # Snap projected distance to closest stop point (only check last and next point)
-                            last_point = path[-1] if path else None
-                            next_point = pts[i + 1] if i + 1 < len(pts) else None
-
-                            # This logic assumes that there will no two stop points in a row
-                            if last_point:
-                                assert last_point.type == "W"
-                            if next_point:
-                                assert next_point["typ"] == "W"
-
-                            last_distance = (
-                                last_point.projected_dist
-                                if last_point
-                                else float("inf")
+                        )
+                    elif pt["typ"] == "S":
+                        stops.append(
+                            PathStopPoint(
+                                pt["lat"],
+                                pt["lon"],
+                                name=pt["stpnm"],
+                                id=pt["stpid"],
+                                reported_dist=pt["pdist"],
                             )
+                        )
 
-                            # Next point is 0 if there is no last_point
-                            # Next point is inf if there is no next_point
-                            # Next point is the distance to the next point if there is a last_point and a next_point
-                            next_distance = float("inf")
-                            if next_point:
-                                if last_point:
-                                    next_distance = (
-                                        path[-1].projected_dist
-                                        + vincenty(
-                                            (last_point.lat, last_point.lon),
-                                            (next_point["lat"], next_point["lon"]),
-                                        )
-                                        * proj_dist_scaling_factor
-                                    )
-                                else:
-                                    next_distance = 0
+                    while (
+                        stops
+                        and path
+                        and vincenty(
+                            (stops[-1].lat, stops[-1].lon),
+                            (path[-1].lat, path[-1].lon),
+                        )
+                        <= 1.0 / 1000
+                    ):
+                        path.pop()
 
-                            proj_dist = min(last_distance, next_distance)
-
-                            path.append(
-                                PathStopPoint(
-                                    lat=pt["lat"],
-                                    lon=pt["lon"],
-                                    name=pt["stpnm"],
-                                    id=pt["stpid"],
-                                    reported_dist=pt["pdist"],
-                                    projected_dist=proj_dist,
-                                )
-                            )
-
-                path, dtrpath = paths
-                snap_path = await snap_path_google_api(
-                    path, os.environ.get("GOOGLE_API_KEY"), proj_dist_scaling_factor
-                )
-
-                route_path = RoutePath(
-                    id=ptr["pid"],
-                    reported_length=ptr["ln"],
-                    direction=ptr["rtdir"],
-                    path=snap_path,
-                    path_orig=path,
-                    dtrid=ptr.get("dtrid", None),
-                    dtrpt=dtrpath,
-                )
-
-                built_paths[route_path.id] = route_path
-
-            built_routes[int(rt["rt"])] = Route(
-                int(rt["rt"]), rt["rtnm"], rt["rtclr"], built_paths
+            path, dtrpath = path_list
+            snap_path = await snap_path_google_api(
+                path, os.environ.get("GOOGLE_API_KEY"), proj_dist_scaling_factor
             )
 
-        return built_routes
+            stops, dtrstops = stop_list
+
+            route_path = RoutePath(
+                id=ptr["pid"],
+                reported_length=ptr["ln"],
+                direction=ptr["rtdir"],
+                path=snap_path,
+                path_orig=path,
+                stops=stops,
+                dtrid=ptr.get("dtrid", None),
+                dtrpt=dtrpath,
+                dtrstops=dtrstops,
+            )
+
+            built_paths[route_path.id] = route_path
+
+        built_routes[int(rt["rt"])] = Route(
+            int(rt["rt"]), rt["rtnm"], rt["rtclr"], built_paths
+        )
+
+    return built_routes
 
 
 async def async_google_snap_to_road_paginated(
@@ -223,14 +195,11 @@ async def async_google_snap_to_road_paginated(
 async def snap_path_google_api(
     path: List[PathPoint], google_api_key: str, proj_dist_scaling_factor=1.0
 ):
-    # new_route_coords = await async_google_snap_to_road_paginated(
-    #     [[pt.lat, pt.lon] for pt in path if pt.type == "W"],
-    #     google_api_key,
-    # )
+    new_route_coords = await async_google_snap_to_road_paginated(
+        [[pt.lat, pt.lon] for pt in path],
+        google_api_key,
+    )
 
-    # # pickle.dump(new_route_coords, open("new_route_coords.p", "wb"))
-
-    new_route_coords = pickle.load(open("new_route_coords.p", "rb"))
     new_path: List[PathPoint] = []
 
     old_path_index = 0
@@ -254,7 +223,9 @@ async def snap_path_google_api(
                 PathPoint(
                     lat,
                     lon,
-                    projected_dist=new_path[-1].projected_dist + new_proj_dist,
+                    projected_dist=(
+                        (new_path[-1].projected_dist) + new_proj_dist if new_path else 0
+                    ),
                 )
             )
             old_path_index += 1
