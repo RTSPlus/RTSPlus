@@ -96,7 +96,9 @@
   - unused
 - tripid = ?
   - can make a request to query tripid
-  - unique on every trip
+    - (future noah) what did i mean by this ???
+  - ~~unique on every trip~~
+  - TRIP ID IS NOT UNIQUE
 - tripdyn = ?
   - unused
 - stst = ?
@@ -174,4 +176,28 @@ order by rt_count;
 
 -- Show routes serviced per weekday
 select distinct rt as rts, date_formatted, strftime(date_formatted::DATE, '%a')  from (select left(epoch_ms(request_time_ms), 11) as date_formatted, * from queries) group by date_formatted, rts order by date_formatted, rts;
+
+-- show # of trips for each routes on a specific day
+select count(*), rt from
+(
+  select distinct tripid, rt from
+    (
+      select epoch_ms(request_time_ms) as request_time, tripid, *
+      from queries
+      where request_time between '2022-12-05 00:00' and '2022-12-05 23:59:59'
+      order by request_time asc
+    )
+  order by rt
+)
+group by rt;
+
+-- select a random tripid and rt on a specific day
+select distinct tripid, rt from
+  (
+    select epoch_ms(request_time_ms) as request_time, tripid, *
+    from queries
+    where request_time between '2022-12-05 00:00' and '2022-12-05 23:59:59'
+    order by request_time asc
+  )
+using sample 1;
 ```
