@@ -8,13 +8,14 @@ from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import NestedCompleter
 
+import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import duckdb
 
 
 from build_routes import build_routes
-from data_model import Route, RoutePath
+from data_model import Route, RoutePath, project_pdist_path
 from util import km2ft
 
 
@@ -70,18 +71,17 @@ def graph_path(path: RoutePath):
             mode="markers+lines",
             lat=waypoints_df["lat"],
             lon=waypoints_df["lon"],
-            marker={"size": 10},
+            marker={"size": 4},
         )
     )
 
-    # Stops
     fig.add_trace(
         go.Scattermapbox(
             mode="markers+text",
             lat=stops_df["lat"],
             lon=stops_df["lon"],
             text=stops_df["combined_text"],
-            marker={"size": 10},
+            marker={"size": 10, "color": "green"},
         )
     )
 
@@ -99,7 +99,7 @@ def graph_path(path: RoutePath):
         },
     )
 
-    fig.show()
+    return fig
 
 
 async def main():
@@ -134,7 +134,13 @@ async def main():
             "query": {
                 "days": None,
                 "trips": {
-                    "day": {date[0].strftime("%Y-%m-%d"): None for date in query_days}
+                    "day": {
+                        **{
+                            date[0].strftime("%Y-%m-%d"): {"trip": {"random": None}}
+                            for date in query_days
+                        },
+                        "random": {"trip": {"random": None}},
+                    }
                 },
             },
             "quit": None,
@@ -184,9 +190,9 @@ async def main():
                         print(f"Paths: {short_str}")
             case ["graph", "path", path_num]:
                 rt = path_map[int(path_num)]
-                graph_path(routes[rt].path[int(path_num)])
+                graph_path(routes[rt].path[int(path_num)]).show()
             case ["query", "days"]:
-                res: List[datetime.date] = con.execute(
+                query_days: List[datetime.date] = con.execute(
                     f"""
                         select distinct request_date from
                         (
@@ -195,18 +201,105 @@ async def main():
                         )
                         """
                 ).fetchall()
-                for date in res:
+                for date in query_days:
                     print(date[0].strftime("%y-%m-%d"))
             case ["query", "trips", "day", day]:
-                print(day)
+                if day == "random":
+                    query_days: List[datetime.date] = con.execute(
+                        f"""
+                            select distinct request_date from
+                            (
+                                select epoch_ms(request_time_ms) as request_time, date_trunc('day', request_time) as request_date, *
+                                from queries
+                            ) using sample 1;
+                            """
+                    ).fetchone()
+                    day = query_days[0].strftime("%Y-%m-%d")
                 query_date = con.execute(
                     f"""
-                    select epoch_ms(request_time_ms) as request_time, tripid
-                    from queries
-                    where request_time between '{day} 00:00' and '{day} 23:59:59' order by request_time asc;
-                """
-                ).fetchall()
-                print(query_date)
+                    select count(distinct tripid) from (
+                        select epoch_ms(request_time_ms) as request_time, tripid
+                        from queries
+                        where request_time between '{day} 00:00' and '{day} 23:59:59'
+                        order by request_time asc
+                    );
+                    """
+                ).fetchone()
+                print(f"{query_date[0]} trips on {day}")
+            case ["query", "trips", "day", day, "trip", specific_id]:
+                if day == "random":
+                    query_days: List[datetime.date] = con.execute(
+                        f"""
+                            select distinct request_date from
+                            (
+                                select epoch_ms(request_time_ms) as request_time, date_trunc('day', request_time) as request_date, *
+                                from queries
+                            ) using sample 1;
+                            """
+                    ).fetchone()
+                    day = query_days[0].strftime("%Y-%m-%d")
+
+                tripid = None
+                if specific_id == "random":
+                    query_random = con.execute(
+                        f"""
+                        select distinct tripid, rt, pid from 
+                        (
+                            select epoch_ms(request_time_ms) as request_time, tripid, *
+                            from queries
+                            where request_time between '{day} 00:00' and '{day} 23:59:59'
+                            order by request_time asc
+                        )
+                        using sample 1;
+                        """
+                    ).fetchone()
+                    tripid, rt, pid = query_random
+                else:
+                    # todo, implement getting rt and pid from tripid lol
+                    tripid = specific_id
+
+                query_trip_df = con.execute(
+                    f"""
+                    select * from (
+                        select epoch_ms(request_time_ms) as request_time, lat, lat - lag(lat, 1, 0) over () as lat_diff, *
+                        from queries
+                        where request_time between '{day} 00:00' and '{day} 23:59:59'
+                        and tripid = '{tripid}'
+                        order by request_time asc
+                    ) where lat_diff != 0 and lat != 0;
+                    """
+                ).df()
+
+                print(f"Route {rt} - {pid}")
+                print(f"Trip {tripid}")
+
+                path = routes[int(rt)].path[int(pid)]
+
+                fig = graph_path(path)
+                query_scatter = px.scatter_mapbox(
+                    query_trip_df,
+                    lat="lat",
+                    lon="lon",
+                    color="pdist",
+                    color_continuous_scale=px.colors.sequential.dense,
+                    zoom=13,
+                ).data[0]
+
+                fig.add_trace(query_scatter)
+
+                fig.show()
+            case ["test", "get", "pdist", path_num]:
+                rt = path_map[int(path_num)]
+                path = routes[rt].path[int(path_num)]
+                print(
+                    path.path[-1].projected_dist,
+                    km2ft(path.path[-1].projected_dist),
+                    path.reported_length,
+                )
+            case ["test", "pdist", path_num, pdist]:
+                rt = path_map[int(path_num)]
+                path = routes[rt].path[int(path_num)].path
+                print(project_pdist_path(path, float(pdist)))
 
 
 if __name__ == "__main__":
