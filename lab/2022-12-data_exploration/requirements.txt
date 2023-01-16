@@ -1,4 +1,5 @@
 duckdb==0.6.1
+importlib-metadata==5.2.0
 numpy==1.23.5
 pandas==1.5.2
 plotly==5.11.0
@@ -6,3 +7,5 @@ python-dateutil==2.8.2
 pytz==2022.6
 six==1.16.0
 tenacity==8.1.0
+visidata==2.10.2
+zipp==3.11.0
