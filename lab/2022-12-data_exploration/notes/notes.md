@@ -94,10 +94,10 @@
   - some values of rid are "MAN" for some reason?
 - blk = ?
   - unused
-- tripid = ?
+- tripid
   - can make a request to query tripid
     - (future noah) what did i mean by this ???
-  - ~~unique on every trip~~
+  - (wrong) unique on every trip
   - TRIP ID IS NOT UNIQUE
 - tripdyn = ?
   - unused
@@ -200,4 +200,16 @@ select distinct tripid, rt from
     order by request_time asc
   )
 using sample 1;
+```
+
+# Remote scraper commands
+
+run python in background and log to file
+
+```bash
+nohup python3 -u scrape.py > scrape.log &
+```
+
+```bash
+ps -aux | grep python
 ```
