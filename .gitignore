@@ -15,3 +15,5 @@ env/
 *.pem
 
 .vscode/settings.json
+
+*.p
