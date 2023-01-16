@@ -7,18 +7,21 @@ import urllib.request
 from urllib.parse import urlencode
 import json
 import os
-
-import sqlite3
 import atexit
+from collections import defaultdict
 
+import duckdb
+import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# seconds
 interval = 5
-con = sqlite3.connect("bus_data.db")
+con = duckdb.connect(database="bus_data.duckdb", read_only=False)
 
-con.execute('CREATE TABLE IF NOT EXISTS query_getroutes(id integer primary key, data text)')
+our_id_column_name = "request_time_ms"
+columns = [x[0] for x in con.execute('describe queries').fetchall()]
 
 def api_call(endpoint_url, request_type, params={}, xtime=None):
     hash_key = os.getenv('RTS_HASH_KEY')
@@ -65,7 +68,7 @@ atexit.register(exit_handler)
 
 while True:
     xtime = round(time.time() * 1000)
-    print(f"Request at {xtime}", end="")
+    print(f"Request at {xtime}")
 
     res_routes = api_call("/api/v3/getroutes", "getroutes")["bustime-response"][
         "routes"
@@ -92,12 +95,14 @@ while True:
             except:
                 pass
 
-    if len(results):
-        cur = con.cursor()
-        cur.execute("insert into query_getroutes values(?, ?)", (xtime, json.dumps(results)))
-        con.commit()
-        print(flush=True)
-    else:
-        print(" - no results", flush=True)
-    
-    time.sleep(interval)
+    if len(results) != 0:
+        new_data = defaultdict(list)
+
+        for result in results:
+            new_data[our_id_column_name].append(xtime)
+            for key in columns:
+                new_data[key].append(result[key])
+        df = pd.DataFrame.from_dict(new_data)
+        con.execute('insert into queries select * from df')
+
+    time.sleep(max(interval - (time.time() - (xtime / 1000)), 0))
