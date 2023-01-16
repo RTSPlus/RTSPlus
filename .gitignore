@@ -11,3 +11,7 @@ env/
 *.pyc
 *.csv
 *.xlsx
+
+*.pem
+
+.vscode/settings.json
