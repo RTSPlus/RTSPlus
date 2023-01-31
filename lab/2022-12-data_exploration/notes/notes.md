@@ -202,14 +202,60 @@ select distinct tripid, rt from
 using sample 1;
 ```
 
-# Remote scraper commands
+# Random misc sql commands
 
-run python in background and log to file
+```sql
+select epoch_ms(request_time_ms) as request_time, tripid
+from queries
+where request_time between '2022-12-05 00:00' and '2022-12-05 23:59:59'
+order by request_time asc;
 
-```bash
-nohup python3 -u scrape.py > scrape.log &
-```
+select count(*), rt from
+(
+  select distinct tripid, rt from
+    (
+      select epoch_ms(request_time_ms) as request_time, tripid, *
+      from queries
+      where request_time between '2022-12-05 00:00' and '2022-12-05 23:59:59'
+      order by request_time asc
+    )
+  order by rt
+)
+group by rt;
 
-```bash
-ps -aux | grep python
+select distinct tripid, rt from
+  (
+    select epoch_ms(request_time_ms) as request_time, tripid, *
+    from queries
+    where request_time between '2022-12-05 00:00' and '2022-12-05 23:59:59'
+    order by request_time asc
+  )
+using sample 1;
+
+select * from (
+  select epoch_ms(request_time_ms) as request_time, lat, lat - lag(lat, 1, 0) over () as lat_diff, *
+  from queries
+  where request_time between '2022-12-03 00:00' and '2022-12-03 23:59:59'
+  and tripid = '3154020'
+  order by request_time asc
+) where lat_diff != 0 and lat != 0;
+
+create table csv_export as
+(select * from (
+    select epoch_ms(request_time_ms) as request_time, lat, lat - lag(lat, 1, 0) over () as lat_diff, *
+    from queries
+    where tripid = '3758020'
+    order by request_time asc
+) where lat_diff != 0 and lat != 0);
+
+COPY csv_export TO 'output.csv' (HEADER, DELIMITER ',');
+
+select request_diff, extract('second' from request_diff) as diff_sec, lat_diff from (
+  select epoch_ms(request_time_ms) as request_time,
+      request_time - lag(request_time, 1) over() as request_diff,
+      lat, lat - lag(lat, 1, 0) over () as lat_diff, *
+    from queries
+    order by request_time asc
+)
+where lat_diff != 0 and lat != 0 and diff_sec != 0;
 ```
