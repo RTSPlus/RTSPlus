@@ -107,6 +107,7 @@
 - stds = date
   - unused
   - superfluous
+- rtdir = direction (inbound/outbound)
 
 ```json
 {'vid': '708',
