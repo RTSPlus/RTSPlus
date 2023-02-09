@@ -82,7 +82,7 @@
   - unused
 - zone = ?
 - mode = ?
-- psgld = ?
+- psgld = capacity status
 - srvtmstmp = timestamp
   - unused
 - idk why this is different from tmstmp
